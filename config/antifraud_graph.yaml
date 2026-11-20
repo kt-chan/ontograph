@@ -1,0 +1,153 @@
+# config/antifraud_graph.yaml
+migration:
+  strategy: deterministic
+  mode: automatic
+  source_db_type: postgresql
+  schema: public
+
+nodes:
+  - table: banks
+    label: Bank
+    id_column: id
+    unique_constraints:
+      - clearing_code
+    indexes:
+      - id
+      - clearing_code
+      - bic
+    properties:
+      - id
+      - name
+      - clearing_code
+      - bic
+
+  - table: accounts
+    label: Account
+    id_column: id
+    unique_constraints:
+      - [bank_id, account_no]
+    indexes:
+      - id
+      - account_no
+      - acct_type
+    properties:
+      - id
+      - account_no
+      - acct_type
+
+  # Kept as an audit/enrichment hub for clearing & fraud assessments
+  - table: transactions
+    label: Transaction
+    id_column: id
+    indexes:
+      - id
+      - ts
+      - amount
+      - tx_type
+      - status
+    properties:
+      - id
+      - amount
+      - currency
+      - ts
+      - tx_type
+      - status
+
+  - table: clearing_batches
+    label: ClearingBatch
+    id_column: id
+    indexes:
+      - id
+      - batch_date
+    properties:
+      - id
+      - batch_date
+      - total_amount
+
+  - table: clearing_records
+    label: ClearingRecord
+    id_column: id
+    indexes:
+      - id
+      - direction
+    properties:
+      - id
+      - direction
+
+  - table: fraud_assessments
+    label: FraudAssessment
+    id_column: id
+    indexes:
+      - id
+      - risk_type
+      - risk_score
+      - assessed_at
+    properties:
+      - id
+      - risk_type
+      - risk_score
+      - assessed_at
+
+relationships:
+  # 1. Direct fund-flow edge for fast multi-hop path & cycle analytics
+  - type: TRANSFERRED_TO
+    source_table: transactions
+    from_table: accounts
+    from_column: sender_account_id
+    to_table: accounts
+    to_column: receiver_account_id
+    indexes:
+      - ts
+      - amount
+      - status
+    properties:
+      - id        # maps to transaction id for joining back to :Transaction
+      - amount
+      - currency
+      - ts
+      - tx_type
+      - status
+
+  # 2. Institutional ownership (useful for cross-bank flow detection)
+  - type: HELD_AT_BANK
+    from_table: accounts
+    from_column: bank_id
+    to_table: banks
+    to_column: id
+
+  # 3. Audit & enrichment links (off the hot flow-traversal path)
+  - type: SENT_TRANSACTION
+    from_table: accounts
+    from_column: id
+    to_table: transactions
+    to_column: sender_account_id
+
+  - type: RECEIVED_TRANSACTION
+    from_table: accounts
+    from_column: id
+    to_table: transactions
+    to_column: receiver_account_id
+
+  - type: HAS_FRAUD_ASSESSMENT
+    from_table: transactions
+    from_column: id
+    to_table: fraud_assessments
+    to_column: transaction_id
+
+  - type: SETTLED_BY_BANK
+    from_table: clearing_batches
+    from_column: bank_id
+    to_table: banks
+    to_column: id
+
+  - type: IN_CLEARING_BATCH
+    from_table: clearing_records
+    from_column: batch_id
+    to_table: clearing_batches
+    to_column: id
+
+  - type: CLEARS_TRANSACTION
+    from_table: clearing_records
+    from_column: transaction_id
+    to_table: transactions
+    to_column: id

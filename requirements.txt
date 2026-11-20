@@ -1,0 +1,29 @@
+# requirements.txt
+# Python 3.11+ 建议
+
+# --- Web 框架 ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+jinja2==3.1.2
+python-dotenv==1.0.1
+
+# --- PostgreSQL（seed.py + Structured2Graph 读取源库） ---
+psycopg2-binary==2.9.10
+
+# --- Memgraph 客户端（FastAPI 内查询 schema / 导出） ---
+# 说明：gqlalchemy 最后稳定版为 1.5.1，与 pydantic v2 并存时偶有警告但可运行。
+# 若安装后出现 pydantic 冲突导致启动失败，可删除 gqlalchemy，
+# 改用官方 neo4j 驱动直连 Memgraph（Bolt 协议兼容），
+# 并相应替换 app/services/memgraph_client.py 中的 db() 实现。
+gqlalchemy==1.10.0
+
+# --- Neo4j 客户端（scripts/load_to_neo4j.py 验证 + LOAD CSV 备选路径） ---
+neo4j==5.28.1
+
+# --- Structured2Graph CLI（阶段二 subprocess 调用的可执行文件来源） ---
+structured2graph==0.3.0
+
+# --- 测试/工具（可选，按需保留） ---
+httpx==0.28.1

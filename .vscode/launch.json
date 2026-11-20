@@ -1,0 +1,76 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Debug: Run Migration (Deterministic)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "app.migrator",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MIGRATION_STRATEGY": "deterministic",
+                "GRAPH_CONFIG_PATH": "${workspaceFolder}/config/antifraud_graph.yaml",
+                "POSTGRES_DATABASE": "antifraud"
+            }
+        },
+        {
+            "name": "Debug: Frontend App (Uvicorn)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "app.frontend:app",
+                "--reload",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8001"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MIGRATION_STRATEGY": "deterministic",
+                "GRAPH_CONFIG_PATH": "${workspaceFolder}/config/antifraud_graph.yaml"
+            }
+        },
+        {
+            "name": "Debug: Backend App (Uvicorn)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "app.backend:app",
+                "--reload",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8002"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MIGRATION_STRATEGY": "deterministic",
+                "GRAPH_CONFIG_PATH": "${workspaceFolder}/config/antifraud_graph.yaml"
+            }
+        }
+    ]
+}

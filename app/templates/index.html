@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anti-Fraud FraudGraphEngine Explorer (Python Prototype)</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang HK", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", "Microsoft YaHei", sans-serif;
+      background: #0b1020;
+      color: #e5e7eb;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr) 320px;
+      grid-template-rows: 56px minmax(0, 1fr);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+    header {
+      grid-column: 1 / -1;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      min-height: 0;
+      gap: 12px;
+    }
+    header h1 { font-size: 15px; font-weight: 600; }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lang-switch {
+      display: inline-flex;
+      background: #0b1020;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .lang-btn {
+      background: transparent;
+      color: #9ca3af;
+      border: none;
+      border-radius: 0;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .lang-btn:hover {
+      background: #1f2937;
+      color: #e5e7eb;
+    }
+    .lang-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1f2937;
+      color: #93c5fd;
+      white-space: nowrap;
+    }
+    .panel {
+      background: #111827;
+      border-right: 1px solid #1f2937;
+      padding: 14px;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .panel.right { border-right: none; border-left: 1px solid #1f2937; }
+    h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+    button.action-btn {
+      background: #1f2937;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button.action-btn:hover { background: #374151; }
+    button.action-btn.active, button.action-btn.primary {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #3b82f6;
+    }
+    button.action-btn.active:hover, button.action-btn.primary:hover { background: #1d4ed8; }
+    button.action-btn.danger {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #ef4444;
+    }
+    button.action-btn.danger:hover { background: #b91c1c; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    textarea, input {
+      width: 100%;
+      background: #0b1020;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 7px 8px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    textarea { min-height: 112px; resize: vertical; }
+    #graph {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      background: #0b1020;
+    }
+    .status-msg { font-size: 12px; color: #93c5fd; min-height: 18px; overflow-wrap: anywhere; }
+    .error-msg { font-size: 12px; color: #fca5a5; overflow-wrap: anywhere; }
+    pre {
+      background: #0b1020;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 11px;
+      overflow: auto;
+      max-height: 260px;
+      color: #d1d5db;
+    }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="titleText">Anti-Fraud FraudGraphEngine Explorer — FastAPI + vis-network Prototype</h1>
+    <div class="header-right">
+      <div class="lang-switch" role="group" aria-label="Language Switcher">
+        <button id="langEn" class="lang-btn active" onclick="setLanguage('en')">EN</button>
+        <button id="langZhHk" class="lang-btn" onclick="setLanguage('zh-HK')">繁中</button>
+        <button id="langZhCn" class="lang-btn" onclick="setLanguage('zh-CN')">简中</button>
+      </div>
+      <span id="healthBadge" class="badge">Checking FraudGraphEngine...</span>
+    </div>
+  </header>
+
+  <aside class="panel">
+    <div>
+      <h2 id="secQueries">Graph & Fraud Queries</h2>
+      <div id="queryBtnGroup" class="btn-row">
+        <button data-query="full" class="action-btn active" onclick="loadFullGraph(this)">Full Graph</button>
+        <button data-query="top-src-dst" class="action-btn" onclick="runPresetCypher('top-src-dst', this)">Top 10 Source-to-Destination</button>
+        <button data-query="top-passthrough" class="action-btn" onclick="runPresetCypher('top-passthrough', this)">Top 10 Pass-Through Accounts</button>
+        <button data-query="high-risk-clearing" class="action-btn" onclick="runPresetCypher('high-risk-clearing', this)">Top 10 High-Risk Clearing</button>
+      </div>
+    </div>
+
+    <div>
+      <h2 id="secCypher">Ad-Hoc Cypher Query</h2>
+      <textarea id="cypherInput">MATCH (a)-[r]->(b)
+RETURN a, r, b
+LIMIT 100</textarea>
+      <div class="btn-row" style="margin-top:6px;">
+        <button id="btnExecCypher" class="action-btn primary" onclick="runCustomCypher()">Execute Cypher</button>
+      </div>
+    </div>
+
+    <div>
+      <h2 id="secInject">Inject Test Fraud Case</h2>
+      <div class="field-grid">
+        <div>
+          <label id="lblTxId">TX ID</label>
+          <input id="injTxId" value="TX-LIVE-9099" />
+        </div>
+        <div>
+          <label id="lblAmount">Amount (HKD)</label>
+          <input id="injAmount" type="number" value="890000" />
+        </div>
+        <div>
+          <label id="lblSender">Sender ID / No</label>
+          <input id="injSender" value="101" />
+        </div>
+        <div>
+          <label id="lblReceiver">Receiver ID / No</label>
+          <input id="injReceiver" value="103" />
+        </div>
+        <div>
+          <label id="lblRiskType">Risk Type</label>
+          <input id="injRiskType" value="CIRCULAR_SPIKE" />
+        </div>
+        <div>
+          <label id="lblRiskScore">Risk Score</label>
+          <input id="injRiskScore" type="number" step="0.01" value="0.96" />
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button id="btnInjectFraud" class="action-btn danger" onclick="injectFraud()">Inject Fraud & Highlight</button>
+      </div>
+    </div>
+
+    <div id="statusBox" class="status-msg"></div>
+    <div id="errorBox" class="error-msg"></div>
+  </aside>
+
+  <main id="graph"></main>
+
+  <aside class="panel right">
+    <div>
+      <h2 id="secSelected">Selected Element</h2>
+      <pre id="selectedJson">Click a node or edge to inspect properties.</pre>
+    </div>
+    <div>
+      <h2 id="secRows">Query Rows</h2>
+      <pre id="rowsJson">No tabular rows yet.</pre>
+    </div>
+  </aside>
+
+  <script>
+    const I18N = {
+      en: {
+        htmlLang: "en",
+        pageTitle: "Anti-Fraud FraudGraphEngine Explorer (Python Prototype)",
+        headerTitle: "Anti-Fraud FraudGraphEngine Explorer — FastAPI + vis-network Prototype",
+        checkingEngine: "Checking FraudGraphEngine...",
+        engineConnected: (url) => `FraudGraphEngine Connected (${url})`,
+        engineDisconnected: "FraudGraphEngine Disconnected",
+        backendUnreachable: "Backend Unreachable",
+        secQueries: "Graph & Fraud Queries",
+        btnFull: "Full Graph",
+        btnTopSrcDst: "Top 10 Source-to-Destination",
+        btnTopPassthrough: "Top 10 Pass-Through Accounts",
+        btnHighRisk: "Top 10 High-Risk Clearing",
+        secCypher: "Ad-Hoc Cypher Query",
+        btnExecCypher: "Execute Cypher",
+        secInject: "Inject Test Fraud Case",
+        lblTxId: "TX ID",
+        lblAmount: "Amount (HKD)",
+        lblSender: "Sender ID / No",
+        lblReceiver: "Receiver ID / No",
+        lblRiskType: "Risk Type",
+        lblRiskScore: "Risk Score",
+        btnInjectFraud: "Inject Fraud & Highlight",
+        secSelected: "Selected Element",
+        defaultSelected: "Click a node or edge to inspect properties.",
+        secRows: "Query Rows",
+        defaultRows: "No tabular rows yet.",
+        renderedGraph: (nodes, edges) => `Rendered ${nodes} nodes and ${edges} edges.`,
+        errLoadGraph: "Failed to load graph",
+        errScenario: "Preset query failed",
+        errCypher: "Cypher error",
+        errInject: "Injection failed"
+      },
+      "zh-HK": {
+        htmlLang: "zh-HK",
+        pageTitle: "反詐騙 FraudGraphEngine 圖譜探索器（Python 原型）",
+        headerTitle: "反詐騙 FraudGraphEngine 圖譜探索器 — FastAPI + vis-network 原型",
+        checkingEngine: "正在檢查 FraudGraphEngine 連線...",
+        engineConnected: (url) => `已連線 FraudGraphEngine (${url})`,
+        engineDisconnected: "FraudGraphEngine 未連線",
+        backendUnreachable: "無法連線後端",
+        secQueries: "圖譜與詐騙查詢",
+        btnFull: "完整圖譜",
+        btnTopSrcDst: "Top 10 資金流向對",
+        btnTopPassthrough: "Top 10 中轉帳戶",
+        btnHighRisk: "Top 10 高風險清算追蹤",
+        secCypher: "自訂 Cypher 查詢",
+        btnExecCypher: "執行 Cypher",
+        secInject: "注入測試詐騙案例",
+        lblTxId: "交易編號 (TX ID)",
+        lblAmount: "金額 (HKD)",
+        lblSender: "付款帳戶 ID / 帳號",
+        lblReceiver: "收款帳戶 ID / 帳號",
+        lblRiskType: "風險類型",
+        lblRiskScore: "風險分數",
+        btnInjectFraud: "注入詐騙並標示",
+        secSelected: "已選取節點／關聯",
+        defaultSelected: "點擊節點或關聯以檢視屬性。",
+        secRows: "查詢結果列",
+        defaultRows: "尚無表格資料。",
+        renderedGraph: (nodes, edges) => `已渲染 ${nodes} 個節點與 ${edges} 條關聯。`,
+        errLoadGraph: "載入圖譜失敗",
+        errScenario: "預設查詢失敗",
+        errCypher: "Cypher 查詢錯誤",
+        errInject: "注入詐騙案例失敗"
+      },
+      "zh-CN": {
+        htmlLang: "zh-CN",
+        pageTitle: "反欺诈 FraudGraphEngine 图谱探索器（Python 原型）",
+        headerTitle: "反欺诈 FraudGraphEngine 图谱探索器 — FastAPI + vis-network 原型",
+        checkingEngine: "正在检查 FraudGraphEngine 连接...",
+        engineConnected: (url) => `已连接 FraudGraphEngine (${url})`,
+        engineDisconnected: "FraudGraphEngine 未连接",
+        backendUnreachable: "无法连接后端",
+        secQueries: "图谱与欺诈查询",
+        btnFull: "完整图谱",
+        btnTopSrcDst: "Top 10 资金流向对",
+        btnTopPassthrough: "Top 10 中转账户",
+        btnHighRisk: "Top 10 高风险清算追踪",
+        secCypher: "自定义 Cypher 查询",
+        btnExecCypher: "执行 Cypher",
+        secInject: "注入测试欺诈案例",
+        lblTxId: "交易编号 (TX ID)",
+        lblAmount: "金额 (HKD)",
+        lblSender: "付款账户 ID / 账号",
+        lblReceiver: "收款账户 ID / 账号",
+        lblRiskType: "风险类型",
+        lblRiskScore: "风险分数",
+        btnInjectFraud: "注入欺诈并高亮",
+        secSelected: "已选节点／关联",
+        defaultSelected: "点击节点或关联以查看属性。",
+        secRows: "查询结果行",
+        defaultRows: "暂无表格数据。",
+        renderedGraph: (nodes, edges) => `已渲染 ${nodes} 个节点和 ${edges} 条关联。`,
+        errLoadGraph: "加载图谱失败",
+        errScenario: "预设查询失败",
+        errCypher: "Cypher 查询错误",
+        errInject: "注入欺诈案例失败"
+      }
+    };
+
+    let currentLang = localStorage.getItem("explorer_lang") || "en";
+    if (!I18N[currentLang]) currentLang = "en";
+    let lastHealthState = { type: "checking", url: "" };
+    let lastRenderCounts = null;
+
+    function t(key, ...args) {
+      const dict = I18N[currentLang] || I18N.en;
+      const val = dict[key] ?? I18N.en[key];
+      return typeof val === "function" ? val(...args) : val;
+    }
+
+    function updateHealthBadge() {
+      const badge = document.getElementById("healthBadge");
+      if (lastHealthState.type === "connected") {
+        badge.textContent = t("engineConnected", lastHealthState.url);
+        badge.style.color = "#6ee7b7";
+      } else if (lastHealthState.type === "disconnected") {
+        badge.textContent = t("engineDisconnected");
+        badge.style.color = "#fca5a5";
+      } else if (lastHealthState.type === "unreachable") {
+        badge.textContent = t("backendUnreachable");
+        badge.style.color = "#fca5a5";
+      } else {
+        badge.textContent = t("checkingEngine");
+        badge.style.color = "#93c5fd";
+      }
+    }
+
+    function applyTranslations() {
+      document.documentElement.lang = t("htmlLang");
+      document.title = t("pageTitle");
+      document.getElementById("titleText").textContent = t("headerTitle");
+      document.getElementById("secQueries").textContent = t("secQueries");
+      document.querySelector('#queryBtnGroup button[data-query="full"]').textContent = t("btnFull");
+      document.querySelector('#queryBtnGroup button[data-query="top-src-dst"]').textContent = t("btnTopSrcDst");
+      document.querySelector('#queryBtnGroup button[data-query="top-passthrough"]').textContent = t("btnTopPassthrough");
+      document.querySelector('#queryBtnGroup button[data-query="high-risk-clearing"]').textContent = t("btnHighRisk");
+      document.getElementById("secCypher").textContent = t("secCypher");
+      document.getElementById("btnExecCypher").textContent = t("btnExecCypher");
+      document.getElementById("secInject").textContent = t("secInject");
+      document.getElementById("lblTxId").textContent = t("lblTxId");
+      document.getElementById("lblAmount").textContent = t("lblAmount");
+      document.getElementById("lblSender").textContent = t("lblSender");
+      document.getElementById("lblReceiver").textContent = t("lblReceiver");
+      document.getElementById("lblRiskType").textContent = t("lblRiskType");
+      document.getElementById("lblRiskScore").textContent = t("lblRiskScore");
+      document.getElementById("btnInjectFraud").textContent = t("btnInjectFraud");
+      document.getElementById("secSelected").textContent = t("secSelected");
+      document.getElementById("secRows").textContent = t("secRows");
+
+      const selEl = document.getElementById("selectedJson");
+      if (selEl.dataset.empty !== "false") {
+        selEl.textContent = t("defaultSelected");
+      }
+      const rowsEl = document.getElementById("rowsJson");
+      if (rowsEl.dataset.empty !== "false") {
+        rowsEl.textContent = t("defaultRows");
+      }
+
+      document.getElementById("langEn").classList.toggle("active", currentLang === "en");
+      document.getElementById("langZhHk").classList.toggle("active", currentLang === "zh-HK");
+      document.getElementById("langZhCn").classList.toggle("active", currentLang === "zh-CN");
+
+      updateHealthBadge();
+
+      if (lastRenderCounts && document.getElementById("statusBox").textContent) {
+        document.getElementById("statusBox").textContent = t(
+          "renderedGraph",
+          lastRenderCounts.nodes,
+          lastRenderCounts.edges
+        );
+      }
+    }
+
+    function setLanguage(lang) {
+      currentLang = I18N[lang] ? lang : "en";
+      localStorage.setItem("explorer_lang", currentLang);
+      applyTranslations();
+    }
+
+    const LABEL_COLORS = {
+      Bank: "#3b82f6",
+      Account: "#10b981",
+      Transaction: "#f59e0b",
+      ClearingBatch: "#8b5cf6",
+      ClearingRecord: "#06b6d4",
+      FraudAssessment: "#ef4444"
+    };
+
+    const QUERY_TEMPLATES = {
+      full: `MATCH (a)-[r]->(b)
+RETURN a, r, b
+LIMIT 100`,
+
+"top-src-dst": `MATCH (src:Account)-[t1:TRANSFERRED_TO]->(mid:Account)-[t2:TRANSFERRED_TO]->(dst:Account)
+WHERE src <> dst
+WITH src, dst, count(*) AS chain_count
+ORDER BY chain_count DESC
+LIMIT 10
+
+MATCH (src)-[t1:TRANSFERRED_TO]->(mid:Account)-[t2:TRANSFERRED_TO]->(dst)
+RETURN src, t1, mid, t2, dst, chain_count
+LIMIT 10`,
+      
+"top-passthrough": `MATCH (src:Account)-[t1:TRANSFERRED_TO]->(mid:Account)-[t2:TRANSFERRED_TO]->(dst:Account)
+WHERE src <> dst
+WITH mid, count(*) AS chain_count
+ORDER BY chain_count DESC
+LIMIT 10
+
+MATCH (src:Account)-[t1:TRANSFERRED_TO]->(mid)-[t2:TRANSFERRED_TO]->(dst:Account)
+WHERE src <> dst
+RETURN src, t1, mid, t2, dst, chain_count
+LIMIT 10`,
+      
+"high-risk-clearing": `MATCH p = (fa:FraudAssessment)<-[:HAS_FRAUD_ASSESSMENT]-(tx:Transaction)<-[cr:CLEARS_TRANSACTION]-(rec:ClearingRecord)-[ib:IN_CLEARING_BATCH]->(cb:ClearingBatch)-[sb:SETTLED_BY_BANK]->(bk:Bank)
+WHERE fa.risk_score >= 0.7 OR tx.status IN ['FLAGGED', 'BLOCKED', 'REVIEW']
+RETURN p, fa, tx, cr, rec, ib, cb, bk
+ORDER BY fa.risk_score DESC
+LIMIT 10`
+    };
+
+    const nodesDS = new vis.DataSet([]);
+    const edgesDS = new vis.DataSet([]);
+
+    const networkOptions = {
+      layout: { improvedLayout: true },
+      physics: {
+        enabled: true,
+        stabilization: { enabled: true, iterations: 120, fit: true },
+        barnesHut: { gravitationalConstant: -4500, springLength: 130 }
+      },
+      edges: {
+        arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+        font: { size: 10, color: "#9ca3af", strokeWidth: 0 },
+        smooth: false
+      },
+      nodes: {
+        shape: "dot",
+        size: 16,
+        font: { size: 12, color: "#e5e7eb" }
+      }
+    };
+
+    const network = new vis.Network(
+      document.getElementById("graph"),
+      { nodes: nodesDS, edges: edgesDS },
+      networkOptions
+    );
+
+    network.once("stabilized", () => {
+      network.setOptions({ physics: { enabled: false } });
+    });
+
+    let rawNodeLookup = {};
+    let rawEdgeLookup = {};
+
+    function setStatus(msg) {
+      document.getElementById("errorBox").textContent = "";
+      document.getElementById("statusBox").textContent = msg;
+    }
+
+    function setError(msg) {
+      lastRenderCounts = null;
+      document.getElementById("statusBox").textContent = "";
+      document.getElementById("errorBox").textContent = msg;
+    }
+
+    function setActiveQueryButton(btnEl = null) {
+      document.querySelectorAll("#queryBtnGroup button").forEach((btn) => {
+        btn.classList.remove("active");
+      });
+      if (btnEl) {
+        btnEl.classList.add("active");
+      }
+    }
+
+    function populateCypherTextarea(key) {
+      if (QUERY_TEMPLATES[key]) {
+        document.getElementById("cypherInput").value = QUERY_TEMPLATES[key];
+      }
+    }
+
+    function shortLabel(n) {
+      const p = n.properties || {};
+      return p.name || p.account_no || p.id || p.risk_type || n.label;
+    }
+
+    function renderGraph(graphData, rows = null) {
+      rawNodeLookup = {};
+      rawEdgeLookup = {};
+
+      const visNodes = (graphData.nodes || []).map((n) => {
+        rawNodeLookup[n.id] = n;
+        const flagged =
+          n.label === "FraudAssessment" ||
+          (n.properties && ["FLAGGED", "BLOCKED"].includes(n.properties.status));
+        return {
+          id: n.id,
+          label: `[${n.label}] ${shortLabel(n)}`,
+          color: {
+            background: LABEL_COLORS[n.label] || "#6b7280",
+            border: flagged ? "#fca5a5" : "#111827"
+          },
+          borderWidth: flagged ? 3 : 1.5
+        };
+      });
+
+      const visEdges = (graphData.edges || []).map((e) => {
+        rawEdgeLookup[e.id] = e;
+        const flagged = e.properties && ["FLAGGED", "BLOCKED"].includes(e.properties.status);
+        const amt = e.properties && e.properties.amount != null ? ` (${e.properties.amount})` : "";
+        return {
+          id: e.id,
+          from: e.source,
+          to: e.target,
+          label: `${e.type}${amt}`,
+          color: { color: flagged ? "#ef4444" : "#4b5563", highlight: "#60a5fa" },
+          width: flagged ? 2.5 : 1.2
+        };
+      });
+
+      network.setOptions({ physics: { enabled: true } });
+      nodesDS.clear();
+      edgesDS.clear();
+      nodesDS.add(visNodes);
+      edgesDS.add(visEdges);
+      network.once("stabilized", () => {
+        network.setOptions({ physics: { enabled: false } });
+      });
+
+      if (rows !== null) {
+        const rowsEl = document.getElementById("rowsJson");
+        rowsEl.dataset.empty = "false";
+        rowsEl.textContent = JSON.stringify(rows, null, 2);
+      }
+      lastRenderCounts = { nodes: visNodes.length, edges: visEdges.length };
+      setStatus(t("renderedGraph", visNodes.length, visEdges.length));
+    }
+
+    network.on("selectNode", (params) => {
+      if (params.nodes.length) {
+        const item = rawNodeLookup[params.nodes[0]];
+        const selEl = document.getElementById("selectedJson");
+        selEl.dataset.empty = "false";
+        selEl.textContent = JSON.stringify(item, null, 2);
+      }
+    });
+
+    network.on("selectEdge", (params) => {
+      if (params.edges.length && !params.nodes.length) {
+        const item = rawEdgeLookup[params.edges[0]];
+        const selEl = document.getElementById("selectedJson");
+        selEl.dataset.empty = "false";
+        selEl.textContent = JSON.stringify(item, null, 2);
+      }
+    });
+
+    async function checkHealth() {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        if (res.ok) {
+          lastHealthState = {
+            type: "connected",
+            url: data.fraud_graph_engine_url || data.graph_engine_url || data.memgraph_url || ""
+          };
+        } else {
+          lastHealthState = { type: "disconnected", url: "" };
+        }
+      } catch {
+        lastHealthState = { type: "unreachable", url: "" };
+      }
+      updateHealthBadge();
+    }
+
+    async function loadFullGraph(btnEl = document.querySelector('#queryBtnGroup button[data-query="full"]')) {
+      setActiveQueryButton(btnEl);
+      populateCypherTextarea("full");
+      try {
+        const res = await fetch("/api/graph?limit=250");
+        const data = await res.json();
+        if (!res.ok) return setError(data.detail || t("errLoadGraph"));
+        renderGraph(data, []);
+      } catch (err) {
+        setError(String(err));
+      }
+    }
+
+    async function runPresetCypher(key, btnEl = null) {
+      setActiveQueryButton(btnEl);
+      populateCypherTextarea(key);
+      const query = QUERY_TEMPLATES[key];
+      if (!query) return;
+      try {
+        const res = await fetch("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!res.ok) return setError(data.detail || t("errScenario"));
+        renderGraph(data.graph, data.rows);
+      } catch (err) {
+        setError(String(err));
+      }
+    }
+
+    async function runCustomCypher() {
+      setActiveQueryButton(null);
+      const query = document.getElementById("cypherInput").value;
+      try {
+        const res = await fetch("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!res.ok) return setError(data.detail || t("errCypher"));
+        renderGraph(data.graph, data.rows);
+      } catch (err) {
+        setError(String(err));
+      }
+    }
+
+    async function injectFraud() {
+      setActiveQueryButton(null);
+      const payload = {
+        tx_id: document.getElementById("injTxId").value,
+        amount: parseFloat(document.getElementById("injAmount").value),
+        sender_account_id: document.getElementById("injSender").value,
+        receiver_account_id: document.getElementById("injReceiver").value,
+        risk_type: document.getElementById("injRiskType").value,
+        risk_score: parseFloat(document.getElementById("injRiskScore").value)
+      };
+      try {
+        const res = await fetch("/api/fraud/inject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) return setError(data.detail || t("errInject"));
+        renderGraph(data.graph, [{ injected: data.injected, tx_id: payload.tx_id }]);
+      } catch (err) {
+        setError(String(err));
+      }
+    }
+
+    applyTranslations();
+    checkHealth();
+    loadFullGraph();
+  </script>
+</body>
+</html>

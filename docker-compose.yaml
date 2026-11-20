@@ -1,0 +1,40 @@
+# docker-compose.yml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: antifraud
+      POSTGRES_USER: antifraud
+      POSTGRES_PASSWORD: antifraud
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  memgraph:
+    image: memgraph/memgraph-mage:latest
+    command: ["--schema-info-enabled=true"]
+    ports:
+      - "7687:7687"
+      - "7444:7444"
+    volumes:
+      - mgdata:/var/lib/memgraph
+
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: neo4j/antifraud123
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7688:7687"   # 宿主机 7688 → 容器 7687，避免与 Memgraph 冲突
+    volumes:
+      - neo4jdata:/data
+      - ./exports:/var/lib/neo4j/import:ro  # 只读，容器无法改 owner
+
+volumes:
+  pgdata:
+  mgdata:
+  neo4jdata:
